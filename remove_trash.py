@@ -1,5 +1,7 @@
 import sys
 import os
+import time
+import tempfile
 
 '''
 Usage: python remove_trash.py <input> <output>
@@ -14,6 +16,10 @@ class progressbar:
     def __init__(self, maxval: int, startval: int):
         self.maxval = maxval
         self.val = startval
+        self.realval = startval
+        
+        self.startval = startval
+        self.starttime = time.time()
     
     def perc(self, val=None):
         if val is None:
@@ -23,15 +29,25 @@ class progressbar:
     def perc_number(self, val=None):
         return int(self.perc(val) * 100)
     
-    def show(self):
+    def eta(self):
+        return round((time.time() - self.starttime) * (self.maxval - self.realval) / (self.realval - self.startval), 2)
+    
+    def get_output(self):
         blocks = int(self.perc() * progressbar.width) 
-        print(f'\r[{"#" * blocks}{"." * (progressbar.width - blocks)}]\t{self.perc_number()}%', end="")
+        return f'\r\33[2K[{"#" * blocks}{"." * (progressbar.width - blocks)}]\t{self.perc_number()}%\tETA: {self.eta()} s'
+    
+    def show(self):
+        print(self.get_output(), end="")
         sys.stdout.flush()
-            
+    
     def update(self, val):
         if self.perc_number(val) > self.perc_number():
             self.val = val
             self.show()
+    
+    def increment(self):
+        self.realval += 1
+        self.update(self.realval)
     
     def end(self):
         print()
@@ -66,6 +82,9 @@ class clonepair:
     def __repr__(self):
         return f'{self.b1.__repr__()},{self.b2.__repr__()}'
     
+    def get_filepair(self):
+        return f'{self.b1.fn};{self.b2.fn}'
+    
     @classmethod
     def duplicate(cls, p1: "clonepair", p2: "clonepair"):
         if p1.b1.is_equal(p2.b1) and p1.b2.is_equal(p2.b2):
@@ -80,12 +99,36 @@ class clonepair:
             return True
         return False
 
-def sort(ifn: str, ofn: str):
+def sort_file_order(ifn: str, total_lines: int):
+    tf = tempfile.NamedTemporaryFile(mode="w", delete=False)
+    progress = progressbar(total_lines, 0)
     with open(ifn, "r") as f:
-        lines = f.readlines()
-    lines = list(map(lambda line: clonepair(line.rstrip()).__repr__() + '\n', lines))
-    with open(ofn, "w") as f:
-        f.writelines(lines)
+        for line in f:
+            tf.write(clonepair(line).__repr__() + '\n')
+            progress.increment()
+    progress.end()
+    tf.close()
+    return tf.name
+
+def sort_lines(ifn: str, total_lines: int):
+    td = tempfile.mkdtemp()
+    batch_size = 500000
+    total_files = (total_lines + batch_size - 1) // batch_size
+    
+    cmd = f'''
+split -l {batch_size} "{ifn}" {td}/
+i=0
+for f in {td}/*
+do
+    i=$((i+1))
+    echo -n "\\r$((100*i/{total_files}))%"
+    sort -t ',' -k1,2 -k5,6 "$f" -o "$f"
+done
+echo -n "\\ndone.\\nMerging... "
+sort -t ',' -k1,2 -k5,6 -m {td}/* -o "{ifn}"
+rm -rf {td}/
+    '''
+    os.system(cmd)
 
 def shrink_block(block: list[clonepair]):
     result = []
@@ -117,50 +160,69 @@ def lines_in_file(fn: str):
     return num_lines
 
 def shrink(ifn: str, ofn: str):
-    print("Sorting... ", end="")
+    start = time.time()
+    
+    print("Counting lines... ", end="")
     sys.stdout.flush()
-    tmpfn = f'{ifn}_tmp'
-    sort(ifn, tmpfn)
-    os.system(f'sort -t \',\' -k1,2 -k5,6 "{tmpfn}" >"{tmpfn}_tmp"')
-    os.system(f'rm -f {tmpfn}')
+    total_lines = lines_in_file(ifn)
     print("done.")
     sys.stdout.flush()
-    tmpfn = tmpfn + "_tmp"
-    total_lines = lines_in_file(tmpfn)
-    current_line = 0
-    progress = progressbar(total_lines, current_line)
-    with open(tmpfn, "r") as f, open(ofn, "w") as of:
-        block = []
-        prev_block_fn = ''
+    
+    print("Sorting each line... ")
+    sys.stdout.flush()
+    tfn = sort_file_order(ifn, total_lines)
+    print("done.")
+    sys.stdout.flush()
+    
+    print(f'Temporary file: "{tfn}"')
+    
+    print("Sorting all lines... ")
+    sys.stdout.flush()
+    sort_lines(tfn, total_lines)
+    print("\ndone.")
+    sys.stdout.flush()
+    
+    
+    progress = progressbar(total_lines, 0)
+    
+    with open(tfn, "r") as f, open(ofn, "w") as of:
         duplicates = 0
         nested = 0
         total = 0
+        
+        block = []
+        prev_filepair = ''
         for line in f:
-            current_line += 1
-            progress.update(current_line)
+            progress.increment()
             
             cp = clonepair(line)
-            block_fn = f'{cp.b1.fn};{cp.b2.fn}'
-            if block_fn != prev_block_fn:
+            curr_filepair = cp.get_filepair()
+            if curr_filepair != prev_filepair:
+                # End of block with same filepair
                 sblock, bduplicates, bnested, btotal = shrink_block(block)
                 write_block(sblock, of)
+                
                 duplicates += bduplicates
                 nested += bnested
                 total += btotal
-                prev_block_fn = block_fn
+                
+                prev_filepair = curr_filepair
                 block = []
             block.append(cp)
+        
         sblock, bduplicates, bnested, btotal = shrink_block(block)
         write_block(sblock, of)
+        
         duplicates += bduplicates
         nested += bnested
         total += btotal
     progress.end()
-    print(f'total input:\t{total} pairs\n')
-    print(f'approved:\t{total - duplicates - nested} pairs ({round((total - duplicates - nested) / total * 100, 5)}%)')
-    print(f'duplicates:\t{duplicates} pairs ({round(duplicates / total * 100, 5)}%)')
-    print(f'nested:\t\t{nested} pairs ({round(nested / total * 100, 5)}%)')
-    os.system(f'rm -f {tmpfn}')
+    print(f'Total input:\t{total} pairs\n')
+    print(f'Approved:\t{total - duplicates - nested} pairs ({round((total - duplicates - nested) / total * 100, 5)}%)')
+    print(f'Duplicates:\t{duplicates} pairs ({round(duplicates / total * 100, 5)}%)')
+    print(f'Nested:\t\t{nested} pairs ({round(nested / total * 100, 5)}%)')
+    print(f'\nElapsed time: {round(time.time() - start, 2)} s')
+    os.system(f'rm -f {tfn}')
                 
 
 def main():
