@@ -3,11 +3,21 @@ import os
 import time
 import tempfile
 
+helpmsg = \
 '''
-Usage: python remove_trash.py <input> <output>
+Usage: python remove_trash.py [-t threshold (default: 1.0)] <input> <output>
 
 Удаляет дубликаты и вложенные пары клонов из файла input, 
-и выводит результат в output
+и выводит результат в output.
+
+Дубликаты определяются с точностью до threshold, так же как и в
+BigCloneEval: 
+- если общая часть двух блоков кода содержится в каждом из этих
+  двух блоков хотя бы на threshold * 100%, то эти блоки кода 
+  считаются совпадающими
+- если у двух пар клонов оба соответствующих блока совпадают по
+  определению выше, то эти пары клонов считают дубликатами, и одна
+  из них удаляется.
 '''
 
 class progressbar:
@@ -61,15 +71,19 @@ class codeblock:
     def __repr__(self):
         return f'{self.fn},{self.begin},{self.end}'
     
+    def length(self):
+        return self.end - self.begin
+    
     def is_inside(self, b: "codeblock"):
         if self.fn != b.fn:
             return False
         return self.begin >= b.begin and self.end <= b.end    
     
-    def is_equal(self, b: "codeblock"):
+    def is_equal(self, b: "codeblock", threshold: float = 1.0):
         if self.fn != b.fn:
             return False
-        return self.begin == b.begin and self.end == b.end
+        common_length = min(self.end, b.end) - max(self.begin, b.begin)
+        return (common_length / self.length() >= threshold) and (common_length / b.length() >= threshold)
 
 class clonepair:
     def __init__(self, s: str):
@@ -86,8 +100,8 @@ class clonepair:
         return f'{self.b1.fn};{self.b2.fn}'
     
     @classmethod
-    def duplicate(cls, p1: "clonepair", p2: "clonepair"):
-        if p1.b1.is_equal(p2.b1) and p1.b2.is_equal(p2.b2):
+    def duplicate(cls, p1: "clonepair", p2: "clonepair", threshold: float = 1.0):
+        if p1.b1.is_equal(p2.b1, threshold=threshold) and p1.b2.is_equal(p2.b2, threshold=threshold):
             return True
         return False
     
@@ -130,7 +144,7 @@ rm -rf {td}/
     '''
     os.system(cmd)
 
-def shrink_block(block: list[clonepair]):
+def shrink_block(block: list[clonepair], threshold: float):
     result = []
     duplicates = 0
     nested = 0
@@ -139,7 +153,7 @@ def shrink_block(block: list[clonepair]):
         approved = True
         total += 1
         for cp2 in result:
-            if clonepair.duplicate(cp1, cp2):
+            if clonepair.duplicate(cp1, cp2, threshold=threshold):
                 duplicates += 1
                 approved = False
                 break
@@ -159,7 +173,7 @@ def lines_in_file(fn: str):
         num_lines = sum(1 for _ in f)
     return num_lines
 
-def shrink(ifn: str, ofn: str):
+def shrink(ifn: str, ofn: str, threshold: float):
     start = time.time()
     
     print("Counting lines... ", end="")
@@ -199,7 +213,7 @@ def shrink(ifn: str, ofn: str):
             curr_filepair = cp.get_filepair()
             if curr_filepair != prev_filepair:
                 # End of block with same filepair
-                sblock, bduplicates, bnested, btotal = shrink_block(block)
+                sblock, bduplicates, bnested, btotal = shrink_block(block, threshold)
                 write_block(sblock, of)
                 
                 duplicates += bduplicates
@@ -210,7 +224,7 @@ def shrink(ifn: str, ofn: str):
                 block = []
             block.append(cp)
         
-        sblock, bduplicates, bnested, btotal = shrink_block(block)
+        sblock, bduplicates, bnested, btotal = shrink_block(block, threshold)
         write_block(sblock, of)
         
         duplicates += bduplicates
@@ -224,11 +238,31 @@ def shrink(ifn: str, ofn: str):
     print(f'\nElapsed time: {round(time.time() - start, 2)} s')
     os.system(f'rm -f {tfn}')
                 
+def help():
+    print(helpmsg)
+    exit(0)
 
 def main():
-    ifn = sys.argv[1]
-    ofn = sys.argv[2]
-    shrink(ifn, ofn)
+    threshold = 1.0
+    ifn = None
+    ofn = None
+    i = 1
+    while (i < len(sys.argv)):
+        if sys.argv[i] == '-t':
+            i += 1
+            threshold = float(sys.argv[i])
+        elif ifn is None:
+            ifn = sys.argv[i]
+        elif ofn is None:
+            ofn = sys.argv[i]
+        else:
+            help()
+        i += 1
+    if threshold <= 0 or threshold > 1:
+        print("Threshold must be in [0.0, 1.0] range.")
+        exit(0)
+            
+    shrink(ifn, ofn, threshold)
 
 if __name__ == "__main__":
     main()
