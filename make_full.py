@@ -43,6 +43,9 @@ class codeblock:
         self.begin = begin
         self.end = end
     
+    def equal(self, cb):
+        return self.fn == cb.fn and self.begin == cb.begin and self.end == cb.end
+    
     def __repr__(self):
         return f'{self.fn},{self.begin},{self.end}'
     
@@ -52,7 +55,7 @@ class codeblock:
             return False
         ibegin, iend = max(b1.begin, b2.begin), min(b1.end, b2.end)
         ilength = iend - ibegin
-        if ilength / (b1.end - b1.begin) >= t or ilength / (b2.end - b2.begin) >= t:
+        if ilength / (b1.end - b1.begin) >= t and ilength / (b2.end - b2.begin) >= t:
             return True
         return False
 
@@ -90,7 +93,7 @@ class clonegraph:
         if cb.fn not in self.files:
             return None
         for u in self.files[cb.fn]:
-            if codeblock.intersect(cb, self.vertices[u].cb, 0.7):
+            if cb.equal(self.vertices[u].cb):
                 return self.vertices[u]
         return None
     
@@ -123,7 +126,7 @@ class clonegraph:
         with open(fn, "w") as f:
             for c in self.classes.itersets():
                 cl = list(c)
-                for i in range(len(cl) - 1):
+                for i in range(len(cl)):
                     for j in range(i):
                         v1 = self.vertices[cl[i]].cb
                         v2 = self.vertices[cl[j]].cb
