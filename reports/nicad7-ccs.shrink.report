@@ -1,6 +1,6 @@
 -- Tool --
        Tool: 8 - nicadccsfullshrink
-Description: NiCad7 + CCSTokener, runned on bcb_reduced, concatted together, shrinked by remove_trash.py
+Description: NiCad7 + CCSTokener, runned on bcb_reduced, concatted together, shrinked by shrink.py
     #Clones: 4695812
 
 -- Versioning --

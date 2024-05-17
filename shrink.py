@@ -5,7 +5,7 @@ import tempfile
 
 helpmsg = \
 '''
-Usage: python remove_trash.py [-t threshold (default: 1.0)] <input> <output>
+Usage: python shrink.py [-t threshold (default: 1.0)] <input> <output>
 
 Удаляет дубликаты и вложенные пары клонов из файла input, 
 и выводит результат в output.
@@ -23,13 +23,15 @@ BigCloneEval:
 class progressbar:
     width = 20
     
-    def __init__(self, maxval: int, startval: int):
+    def __init__(self, maxval: int, startval: int, precision: int = 0):
         self.maxval = maxval
         self.val = startval
         self.realval = startval
+        self.precision = precision
         
         self.startval = startval
         self.starttime = time.time()
+        self.prevtime = self.starttime
     
     def perc(self, val=None):
         if val is None:
@@ -37,29 +39,39 @@ class progressbar:
         return val / self.maxval
     
     def perc_number(self, val=None):
-        return int(self.perc(val) * 100)
+        return round(self.perc(val) * 100, self.precision)
     
     def eta(self):
         return round((time.time() - self.starttime) * (self.maxval - self.realval) / (self.realval - self.startval), 2)
     
+    def elapsed(self):
+        return self.prevtime - self.starttime
+    
     def get_output(self):
         blocks = int(self.perc() * progressbar.width) 
-        return f'\r\33[2K[{"#" * blocks}{"." * (progressbar.width - blocks)}]\t{self.perc_number()}%\tETA: {self.eta()} s'
+        fmt = f'\r\33[2K[{{}}{{}}]\t{{: 3.{self.precision}f}}%\tETA: {{:.2f}} s\tELAPSED: {{:.2f}} s'
+        return fmt.format("#" * blocks, "." * (progressbar.width - blocks), self.perc_number(), self.eta(), self.elapsed())
     
     def show(self):
         print(self.get_output(), end="")
         sys.stdout.flush()
     
     def update(self, val):
-        if self.perc_number(val) > self.perc_number():
-            self.val = val
-            self.show()
+        if round(self.perc_number(val), self.precision) > round(self.perc_number(), self.precision):
+            curr_time = time.time()
+            if time.time() - self.prevtime > 0.5:
+                self.val = val
+                self.prevtime = curr_time
+                self.show()
     
     def increment(self):
         self.realval += 1
         self.update(self.realval)
     
     def end(self):
+        self.val = self.maxval
+        self.prevtime = time.time()
+        self.show()
         print()
 
 class codeblock:
@@ -261,6 +273,8 @@ def main():
     if threshold <= 0 or threshold > 1:
         print("Threshold must be in [0.0, 1.0] range.")
         exit(0)
+    if ifn is None or ofn is None:
+        help()
             
     shrink(ifn, ofn, threshold)
 

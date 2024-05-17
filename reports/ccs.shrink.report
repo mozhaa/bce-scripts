@@ -1,6 +1,6 @@
 -- Tool --
        Tool: 4 - ccsfullshrink
-Description: CCSTokener, runned on bcb_reduced, shrinked by remove_trash.py
+Description: CCSTokener, runned on bcb_reduced, shrinked by shrink.py
     #Clones: 4513058
 
 -- Versioning --

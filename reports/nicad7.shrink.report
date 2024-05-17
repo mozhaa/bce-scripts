@@ -1,6 +1,6 @@
 -- Tool --
        Tool: 6 - nicadfullshrink
-Description: NiCad7, runned on bcb_reduced, shrinked by remove_trash.py
+Description: NiCad7, runned on bcb_reduced, shrinked by shrink.py
     #Clones: 1501389
 
 -- Versioning --
