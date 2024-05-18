@@ -156,12 +156,13 @@ rm -rf {td}/
     '''
     os.system(cmd)
 
-def shrink_block(block: list[clonepair], threshold: float):
+def shrink_block(block: list[clonepair], threshold: float, progress: progressbar):
     result = []
     duplicates = 0
     nested = 0
     total = 0
     for cp1 in block:
+        progress.increment()
         approved = True
         total += 1
         for cp2 in result:
@@ -209,7 +210,7 @@ def shrink(ifn: str, ofn: str, threshold: float):
     sys.stdout.flush()
     
     
-    progress = progressbar(total_lines, 0)
+    progress = progressbar(total_lines, 0, 4)
     
     with open(tfn, "r") as f, open(ofn, "w") as of:
         duplicates = 0
@@ -219,13 +220,11 @@ def shrink(ifn: str, ofn: str, threshold: float):
         block = []
         prev_filepair = ''
         for line in f:
-            progress.increment()
-            
             cp = clonepair(line)
             curr_filepair = cp.get_filepair()
             if curr_filepair != prev_filepair:
                 # End of block with same filepair
-                sblock, bduplicates, bnested, btotal = shrink_block(block, threshold)
+                sblock, bduplicates, bnested, btotal = shrink_block(block, threshold, progress)
                 write_block(sblock, of)
                 
                 duplicates += bduplicates
@@ -236,7 +235,7 @@ def shrink(ifn: str, ofn: str, threshold: float):
                 block = []
             block.append(cp)
         
-        sblock, bduplicates, bnested, btotal = shrink_block(block, threshold)
+        sblock, bduplicates, bnested, btotal = shrink_block(block, threshold, progress)
         write_block(sblock, of)
         
         duplicates += bduplicates
