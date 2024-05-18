@@ -36,33 +36,31 @@
 
 ## Отчёты
 
+В папке `reports` есть две директории: `mip6-mit50` и `mip10-mil10-mit50`. Они различаются парамаетрами **BigCloneEval**, с которыми его запускали.
+
 ### 1. `ccs.report`
 
-**CCSTokener** в режиме `bcb`, запущенный на всей директории `bcb_reduced`, оценённый BigCloneEval с параметрами `--mil 10 --mip 10 --mit 50`.
+**CCSTokener** в режиме `bcb`.
 
 ### 2. `ccs.shrink.report`
 
-**CCSTokener** в режиме `bcb`, запущенный на всей директории `bcb_reduced` и обработанный скриптом `shrink.py`, оценённый BigCloneEval с параметрами `--mil 10 --mip 10 --mit 50`.
+**CCSTokener** в режиме `bcb`, обработанный скриптом `shrink.py`.
 
 ### 3. `nicad7.report`
 
-**NiCad7** с параметром `mip=10`, запущенный на всей директории `bcb_reduced`, оценённый BigCloneEval с параметрами `--mil 10 --mip 10 --mit 50`.
+**NiCad7** с параметром `mip=6` (в `mip10-mil10-mit50` у **NiCad7** параметр `mip=10`).
 
 ### 4. `nicad7.shrink.report`
 
-**NiCad7** с параметром `mip=10`, запущенный на всей директории `bcb_reduced` и обработанный скриптом `shrink.py`, оценённый BigCloneEval с параметрами `--mil 10 --mip 10 --mit 50`.
+**NiCad7** с параметром `mip=6` (в `mip10-mil10-mit50` у **NiCad7** параметр `mip=10`), обработанный скриптом `shrink.py`.
 
 ### 5. `nicad7-ccs.report`
 
-Результат конкатенации `ccs.report` и `nicad7.report`, оценённый BigCloneEval с параметрами `--mil 10 --mip 10 --mit 50`.
+Отчёт по конкатенации двух наборов из `ccs.report` и `nicad7.report`.
 
 ### 6. `nicad7-ccs.shrink.report`
 
-Результат конкатенации `ccs.report` и `nicad7.report`, обработанный скриптом `shrink.py`, оценённый BigCloneEval с параметрами `--mil 10 --mip 10 --mit 50`.
-
-### 7. `nicad7.mip6.report`
-
-**NiCad7** с параметром `mip=6`, запущенный на всей директории `bcb_reduced`, оценённый BigCloneEval с параметрами `--mip 6 --mit 50`.
+Отчёт по конкатенации двух наборов из `ccs.report` и `nicad7.report`, обработанный скриптом `shrink.py`.
 
 ## Использование на инструментах для нахождения клонов
 
